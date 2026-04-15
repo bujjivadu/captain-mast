@@ -1,0 +1,44 @@
+# captain-mast ACL file
+# Syntax is compatible with Mosquitto's acl_file format
+#
+# Directives:
+#   topic [read|write|readwrite|none] <filter>
+#   user <username>
+#   pattern [read|write|readwrite|none] <filter>
+#
+# Wildcards: + (single level), # (zero or more levels)
+# Pattern substitutions: %u (username), %c (client_id)
+#
+# Rules are checked in order: pattern → user-specific → global
+# First match wins. Default is DENY.
+
+# ── Global rules (apply to all authenticated users) ───────────────────────────
+
+# Allow everyone to read broker system topics
+topic read $SYS/#
+
+# ── Per-user rules ─────────────────────────────────────────────────────────────
+
+# Superuser — full access to all topics
+user admin
+topic readwrite #
+
+# Read-only monitoring account
+user monitor
+topic read #
+
+# ── Device pattern rules ───────────────────────────────────────────────────────
+# Devices can only publish to their own namespace and read their own commands.
+# %u is replaced with the connecting username at match time.
+
+pattern write   devices/%u/#
+pattern write   status/%u
+pattern read    commands/%u/#
+
+# ── Example named device ───────────────────────────────────────────────────────
+
+user sensor-01
+topic write sensors/sensor-01/temperature
+topic write sensors/sensor-01/humidity
+topic write status/sensor-01
+topic read  commands/sensor-01/#
