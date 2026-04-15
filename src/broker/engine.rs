@@ -28,12 +28,31 @@ impl BrokerEngine {
     pub fn start(self) -> Result<()> {
         let allow_anonymous = self.config.allow_anonymous;
         let max_connections = if self.config.max_connections < 0 {
-            // rumqttd uses usize; saturate to a practical max instead of usize::MAX
-            // to avoid overflow in internal allocations
             100_000_usize
         } else {
             self.config.max_connections as usize
         };
+
+        // Validate mTLS config before touching rumqttd: every listener with
+        // require_certificate=true must also have cafile, certfile, and keyfile.
+        for l in &self.config.listeners {
+            if let Some(tls) = &l.tls {
+                if tls.require_certificate {
+                    if tls.cafile.is_none() {
+                        return Err(MastError::Config(format!(
+                            "Listener on port {} has require_certificate=true but no cafile",
+                            l.port
+                        )));
+                    }
+                    if tls.certfile.is_none() || tls.keyfile.is_none() {
+                        return Err(MastError::Config(format!(
+                            "Listener on port {} has require_certificate=true but missing certfile/keyfile",
+                            l.port
+                        )));
+                    }
+                }
+            }
+        }
 
         let passwd = Arc::clone(&self.passwd);
 
@@ -50,12 +69,12 @@ impl BrokerEngine {
 
         // Log what we're about to start
         for l in &self.config.listeners {
-            let proto = match (l.websocket, l.tls.is_some()) {
-                (true, true) => "WSS",
-                (true, false) => "WS",
-                (false, true) => "TLS",
-                (false, false) => "TCP",
+            let tls_tag = match &l.tls {
+                Some(t) if t.require_certificate => "mTLS",
+                Some(_) => "TLS",
+                None => if l.websocket { "WS" } else { "TCP" },
             };
+            let proto = if l.websocket && l.tls.is_some() { "WSS/mTLS" } else { tls_tag };
             let bind = l.bind_addr.as_deref().unwrap_or("0.0.0.0");
             info!("  listener {}:{} [{}]", bind, l.port, proto);
         }
@@ -136,10 +155,18 @@ fn build_rumqttd_config(config: &MastConfig, max_connections: usize) -> Config {
         });
 
         let tls = listener.tls.as_ref().and_then(|t| {
-            // Both certfile and keyfile must be present to enable TLS
+            // certfile + keyfile are required for any TLS listener.
             let cert = t.certfile.as_ref()?.to_string_lossy().into_owned();
             let key = t.keyfile.as_ref()?.to_string_lossy().into_owned();
-            let ca = t.cafile.as_ref().map(|p| p.to_string_lossy().into_owned());
+            // capath is only passed when require_certificate=true.
+            // With the verify-client-cert feature compiled in, a Some(capath)
+            // enables WebPkiClientVerifier — the broker will reject any client
+            // that does not present a valid certificate signed by that CA.
+            let ca = if t.require_certificate {
+                t.cafile.as_ref().map(|p| p.to_string_lossy().into_owned())
+            } else {
+                None
+            };
             Some(TlsConfig::Rustls {
                 capath: ca,
                 certpath: cert,

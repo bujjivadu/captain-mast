@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Broker engine
-rumqttd = { version = "0.20", default-features = false, features = ["use-rustls"] }
+rumqttd = { version = "0.20", default-features = false, features = ["use-rustls", "verify-client-cert"] }
 
 # Async runtime (managed internally by rumqttd; we use it for the auth handler future)
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

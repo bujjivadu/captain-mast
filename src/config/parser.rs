@@ -115,6 +115,30 @@ impl MastConfig {
                         l.websocket = value == "true" || value == "websockets";
                     }
                 }
+                "require_certificate" => {
+                    if let Some(ref mut l) = current_listener {
+                        match value {
+                            "true" => {
+                                l.tls.get_or_insert_with(TlsListenerConfig::default)
+                                    .require_certificate = true;
+                            }
+                            "false" => {
+                                if let Some(ref mut t) = l.tls {
+                                    t.require_certificate = false;
+                                }
+                            }
+                            _ => {
+                                return Err(MastError::ConfigParse {
+                                    line: line_num,
+                                    message: format!(
+                                        "Expected true/false for require_certificate, got '{}'",
+                                        value
+                                    ),
+                                })
+                            }
+                        }
+                    }
+                }
 
                 // Global auth/acl
                 "password_file" => config.password_file = Some(PathBuf::from(value)),
@@ -220,6 +244,10 @@ pub struct TlsListenerConfig {
     pub cafile: Option<PathBuf>,
     pub certfile: Option<PathBuf>,
     pub keyfile: Option<PathBuf>,
+    /// When true the broker requires every client to present a certificate
+    /// signed by the CA in `cafile` (mutual TLS).  Mirrors Mosquitto's
+    /// `require_certificate` directive.  Defaults to false.
+    pub require_certificate: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
