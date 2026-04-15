@@ -18,4 +18,7 @@ pub enum MastError {
 
     #[error("Broker error: {0}")]
     Broker(String),
+
+    #[error("Inference error: {0}")]
+    Inference(String),
 }

@@ -12,8 +12,8 @@ path = "src/main.rs"
 # Broker engine
 rumqttd = { version = "0.20", default-features = false, features = ["use-rustls", "verify-client-cert"] }
 
-# Async runtime (managed internally by rumqttd; we use it for the auth handler future)
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+# Async runtime
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 # Password hashing
 bcrypt = "0.15"
@@ -30,3 +30,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 # Error handling
 thiserror = "1"
+
+# ── Inference ──────────────────────────────────────────────────────────────────
+
+# HTTP client for HF Inference API (rustls so no OpenSSL dependency)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# JSON serialization for HF request/response
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

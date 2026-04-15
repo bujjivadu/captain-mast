@@ -1,2 +1,2 @@
 mod parser;
-pub use parser::MastConfig;
+pub use parser::{InferenceConfig, MastConfig};

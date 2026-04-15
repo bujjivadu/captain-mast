@@ -18,6 +18,42 @@ pub struct MastConfig {
     pub max_connections: i64,
     pub max_inflight_messages: usize,
     pub max_queued_messages: usize,
+    /// Hugging Face inference integration (proactive threat detection).
+    pub inference: InferenceConfig,
+}
+
+// ── InferenceConfig ───────────────────────────────────────────────────────────
+
+/// Configuration for the HF inference-based proactive monitoring engine.
+#[derive(Debug, Clone)]
+pub struct InferenceConfig {
+    /// Enable the inference monitor (default: false).
+    pub enabled: bool,
+    /// HF API key (`hf_xxxx…`).  Required when `enabled = true`.
+    pub api_key: String,
+    /// HF model ID (default: `facebook/bart-large-mnli`).
+    pub model: String,
+    /// Override the full inference endpoint URL.
+    /// Auto-constructed from `model` when None.
+    pub endpoint: Option<String>,
+    /// How often to run a full analysis (seconds, default: 30).
+    pub analysis_interval_secs: u64,
+    /// Confidence threshold above which a non-normal label triggers action
+    /// (0.0–1.0, default: 0.75).
+    pub threat_threshold: f32,
+}
+
+impl Default for InferenceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            api_key: String::new(),
+            model: "facebook/bart-large-mnli".into(),
+            endpoint: None,
+            analysis_interval_secs: 30,
+            threat_threshold: 0.75,
+        }
+    }
 }
 
 impl Default for MastConfig {
@@ -39,6 +75,7 @@ impl Default for MastConfig {
             max_connections: -1,
             max_inflight_messages: 20,
             max_queued_messages: 1000,
+            inference: InferenceConfig::default(),
         }
     }
 }
@@ -196,6 +233,18 @@ impl MastConfig {
                 }
                 "max_queued_messages" => {
                     config.max_queued_messages = value.parse().unwrap_or(1000)
+                }
+
+                // ── Hugging Face inference ─────────────────────────────────
+                "hf_enabled" => config.inference.enabled = value == "true",
+                "hf_api_key" => config.inference.api_key = value.to_string(),
+                "hf_model" => config.inference.model = value.to_string(),
+                "hf_endpoint" => config.inference.endpoint = Some(value.to_string()),
+                "hf_analysis_interval" => {
+                    config.inference.analysis_interval_secs = value.parse().unwrap_or(30)
+                }
+                "hf_threat_threshold" => {
+                    config.inference.threat_threshold = value.parse().unwrap_or(0.75)
                 }
 
                 other => {
