@@ -49,8 +49,13 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum PasswdAction {
-    /// Add or update a user (prompts for password)
-    Set { username: String },
+    /// Add or update a user (prompts for password, or use --password for scripted use)
+    Set {
+        username: String,
+        /// Set password non-interactively (use in scripts; omit to prompt)
+        #[arg(short, long)]
+        password: Option<String>,
+    },
     /// Delete a user
     Delete { username: String },
     /// List all users in the password file
@@ -149,15 +154,19 @@ fn passwd_cmd(
     };
 
     match action {
-        PasswdAction::Set { username } => {
-            let password = rpassword::prompt_password(format!("Password for {username}: "))
-                .map_err(MastError::Io)?;
-            let confirm = rpassword::prompt_password("Confirm password: ").map_err(MastError::Io)?;
-
-            if password != confirm {
-                eprintln!("Error: passwords do not match");
-                std::process::exit(1);
-            }
+        PasswdAction::Set { username, password: pw_flag } => {
+            let password = if let Some(p) = pw_flag {
+                p
+            } else {
+                let p = rpassword::prompt_password(format!("Password for {username}: "))
+                    .map_err(MastError::Io)?;
+                let confirm = rpassword::prompt_password("Confirm password: ").map_err(MastError::Io)?;
+                if p != confirm {
+                    eprintln!("Error: passwords do not match");
+                    std::process::exit(1);
+                }
+                p
+            };
 
             let mut store = if passwd_path.exists() {
                 PasswdStore::load(&passwd_path)?

@@ -1,6 +1,11 @@
 # captain-mast ACL file
 # Syntax is compatible with Mosquitto's acl_file format
 #
+# Important: in the current captain-mast broker engine this file is parsed but
+# not yet enforced for publish/subscribe decisions. Authentication and mTLS are
+# enforced; topic ACL enforcement still needs broker hooks or a different broker
+# backend before this should be treated as a production security boundary.
+#
 # Directives:
 #   topic [read|write|readwrite|none] <filter>
 #   user <username>
@@ -28,12 +33,23 @@ user monitor
 topic read #
 
 # ── Device pattern rules ───────────────────────────────────────────────────────
-# Devices can only publish to their own namespace and read their own commands.
+# Devices should authenticate with username = device serial.
 # %u is replaced with the connecting username at match time.
 
 pattern write   devices/%u/#
 pattern write   status/%u
 pattern read    commands/%u/#
+
+# ── CR-One Edge firmware topic contract ────────────────────────────────────────
+#
+# cr-one-edge-fw currently documents this production MQTT contract:
+#   publish   cr/heartbeat/{serial}
+#   publish   cr/tap/{serial}
+#   subscribe cr/tap-ack/{serial}
+
+pattern write   cr/heartbeat/%u
+pattern write   cr/tap/%u
+pattern read    cr/tap-ack/%u
 
 # ── Example named device ───────────────────────────────────────────────────────
 
@@ -42,3 +58,8 @@ topic write sensors/sensor-01/temperature
 topic write sensors/sensor-01/humidity
 topic write status/sensor-01
 topic read  commands/sensor-01/#
+
+user cr-one-001
+topic write cr/heartbeat/cr-one-001
+topic write cr/tap/cr-one-001
+topic read  cr/tap-ack/cr-one-001

@@ -173,6 +173,15 @@ fn wire_auth(
     event_tx: Option<mpsc::Sender<BrokerEvent>>,
     block_list: Arc<BlockList>,
 ) {
+    // When fully anonymous (no passwords configured + allow_anonymous=true) skip
+    // the external_auth handler entirely.  rumqttd's native "no auth = allow all"
+    // path accepts CONNECT packets that carry no username/password field, which is
+    // what unauthenticated MQTT clients send.  Installing a handler forces rumqttd
+    // to require a login field even when the handler would accept empty credentials.
+    if allow_anonymous && passwd.is_empty() {
+        return;
+    }
+
     for (_, server) in servers.iter_mut() {
         let passwd = Arc::clone(&passwd);
         let tx = event_tx.clone();
