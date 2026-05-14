@@ -134,6 +134,10 @@ fn main() -> Result<()> {
     };
 
     // ── Broker ────────────────────────────────────────────────────────────────
+    // Install the logging client-cert verifier (rumqttd fork hook). Must run
+    // before BrokerEngine constructs the TLS listener.
+    crate::broker::tls::install();
+
     BrokerEngine::new(config, passwd, acl, block_list, event_tx, event_rx).start()
 }
 
